@@ -1,0 +1,257 @@
+setwd(dirname(rstudioapi::getSourceEditorContext()$path))
+
+# install.packages("gtools")
+
+# get list of somatic neuron names
+options(scipen=999)
+neuron_names = read.csv("tfs_expression_binary.csv", header = FALSE)$V1
+neuron_names = as.character(neuron_names)
+non_somatic_neuron_names = read.csv("non_somatic_neurons.csv", header = FALSE)$V1
+non_somatic_neuron_names = as.character(non_somatic_neuron_names)
+somatic_neuron_names = neuron_names[!neuron_names %in% non_somatic_neuron_names]
+
+# get somatic connectome
+connectome = neuron_names = read.csv("herm_full_edgelist_090618.csv")
+trimws(connectome$Source, which = "right") -> connectome$Source
+trimws(connectome$Target, which = "both") -> connectome$Target
+somatic_connectome = subset(connectome, Source %in% somatic_neuron_names & Target %in% somatic_neuron_names)
+
+# remove bilateral pairs from entire connectome
+somatic_connectome$Source = sub("R$", "", somatic_connectome$Source)
+somatic_connectome$Source = sub("L$", "", somatic_connectome$Source)
+somatic_connectome$Target = sub("R$", "", somatic_connectome$Target)
+somatic_connectome$Target = sub("L$", "", somatic_connectome$Target)
+bilateral_connections_to_except = somatic_connectome[(somatic_connectome$Source == somatic_connectome$Target),]
+bilateral_rows_to_except = row.names(bilateral_connections_to_except)
+somatic_connectome = subset(connectome, Source %in% somatic_neuron_names & Target %in% somatic_neuron_names)
+nobp_somatic_connectome = somatic_connectome[!row.names(somatic_connectome) %in% bilateral_rows_to_except,]
+bilateral_connections_to_except = which(nobp_somatic_connectome$Source=="ADLL" & nobp_somatic_connectome$Target=="ADLR")
+nobp_somatic_connectome = nobp_somatic_connectome[-bilateral_connections_to_except,]
+bilateral_connections_to_except = which(nobp_somatic_connectome$Source=="ADLR" & nobp_somatic_connectome$Target=="ADLL")
+nobp_somatic_connectome = nobp_somatic_connectome[-bilateral_connections_to_except,]
+bilateral_connections_to_except = which(nobp_somatic_connectome$Source=="OLLL" & nobp_somatic_connectome$Target=="OLLR")
+nobp_somatic_connectome = nobp_somatic_connectome[-bilateral_connections_to_except,]
+bilateral_connections_to_except = which(nobp_somatic_connectome$Source=="OLLR" & nobp_somatic_connectome$Target=="OLLL")
+nobp_somatic_connectome = nobp_somatic_connectome[-bilateral_connections_to_except,]
+
+
+# remove interclass connections
+RMD = nobp_somatic_connectome[grep("RMD", nobp_somatic_connectome$Source),]
+RMD = RMD[grep("RMD", RMD$Target),]
+# AS neurons have no interclass connections
+CEP = nobp_somatic_connectome[grep("CEP", nobp_somatic_connectome$Source),]
+CEP = CEP[grep("CEP", CEP$Target),]
+DA = nobp_somatic_connectome[grep("DA0", nobp_somatic_connectome$Source),]
+DA = DA[grep("DA0", DA$Target),]
+DB = nobp_somatic_connectome[grep("DB0", nobp_somatic_connectome$Source),]
+DB = DB[grep("DB0", DB$Target),]
+DD = nobp_somatic_connectome[grep("DD0", nobp_somatic_connectome$Source),]
+DD = DD[grep("DD0", DD$Target),]
+IL1 = nobp_somatic_connectome[grep("IL1", nobp_somatic_connectome$Source),]
+IL1 = IL1[grep("IL1", IL1$Target),]
+IL2 = nobp_somatic_connectome[grep("IL2", nobp_somatic_connectome$Source),]
+IL2 = IL2[grep("IL2", IL2$Target),]
+# the OLQ neurons have no interclass connections
+RME = nobp_somatic_connectome[grep("RME", nobp_somatic_connectome$Source),]
+RME = RME[grep("RME", RME$Target),]
+SAA = nobp_somatic_connectome[grep("SAA", nobp_somatic_connectome$Source),]
+SAA = SAA[grep("SAA", SAA$Target),]
+# the SAB neurons have no interclass connections
+# the SIA neurons have no interclass connections
+SIB = nobp_somatic_connectome[grep("SIB", nobp_somatic_connectome$Source),]
+SIB = SIB[grep("SIB", SIB$Target),]
+SMB = nobp_somatic_connectome[grep("SMB", nobp_somatic_connectome$Source),]
+SMB = SMB[grep("SMB", SMB$Target),]
+SMD = nobp_somatic_connectome[grep("SMD", nobp_somatic_connectome$Source),]
+SMD = SMD[grep("SMD", SMD$Target),]
+# the URA neurons have no interclass connections
+VA = nobp_somatic_connectome[grep("VA[0-1]", nobp_somatic_connectome$Source),]
+VA = VA[grep("VA[0-1]", VA$Target),]
+VB = nobp_somatic_connectome[grep("VB[0-1]", nobp_somatic_connectome$Source),]
+VB = VB[grep("VB[0-1]", VB$Target),]
+VC = nobp_somatic_connectome[grep("VC[0-1]", nobp_somatic_connectome$Source),]
+VC = VC[grep("VC[0-1]", VC$Target),]
+VD = nobp_somatic_connectome[grep("VD[0-1]", nobp_somatic_connectome$Source),]
+VD = VD[grep("VD[0-1]", VD$Target),]
+interclass = rbind(RMD, CEP, DA, DB, DD, IL1, IL2, RME, SAA, SIB, SMB, SMD, VA, VB, VC, VD)
+# now remove the interclass connections
+nobp_somatic_connectome = nobp_somatic_connectome[!rownames(nobp_somatic_connectome) %in% rownames(interclass),]
+
+# find the total possible successes
+library(gtools)
+somatic_neurons = permutations(length(somatic_neuron_names),2, somatic_neuron_names)
+# then remove bilateral pairs
+rownames(somatic_neurons) = rownames(somatic_neurons, do.NULL = F)
+somatic_neurons = sub("R$", "", somatic_neurons)
+somatic_neurons = sub("L$", "", somatic_neurons)
+bp = somatic_neurons[(somatic_neurons[,1]==somatic_neurons[,2]),]
+bp_row_names = rownames(bp, do.NULL = F)
+somatic_neurons = permutations(length(somatic_neuron_names), 2, somatic_neuron_names)
+rownames(somatic_neurons) = rownames(somatic_neurons, do.NULL = F)
+nobp_neuron_permutations = somatic_neurons[!rownames(somatic_neurons) %in% bp_row_names,]
+nrow(nobp_neuron_permutations)
+ADL1 = which(nobp_neuron_permutations[,1]=="ADLL" & nobp_neuron_permutations[,2]=="ADLR")
+nobp_neuron_permutations = nobp_neuron_permutations[-ADL1,]
+ADL2 = which(nobp_neuron_permutations[,1]=="ADLR" & nobp_neuron_permutations[,2]=="ADLL")
+nobp_neuron_permutations = nobp_neuron_permutations[-ADL2,]
+OLL1 = which(nobp_neuron_permutations[,1]=="OLLL" & nobp_neuron_permutations[,2]=="OLLR")
+nobp_neuron_permutations = nobp_neuron_permutations[-OLL1,]
+OLL2 = which(nobp_neuron_permutations[,1]=="OLLR" & nobp_neuron_permutations[,2]=="OLLL")
+nobp_neuron_permutations = nobp_neuron_permutations[-OLL2,]
+# then remove the interclass pairs
+nobp_neuron_permutations = as.data.frame(nobp_neuron_permutations)
+RMD = nobp_neuron_permutations[grep("RMD", nobp_neuron_permutations$V1),]
+RMD = RMD[grep("RMD", RMD$V2),]
+AS = nobp_neuron_permutations[grep("AS[0-1]", nobp_neuron_permutations$V1),]
+AS = AS[grep("AS[0-1]", AS$V2),]
+CEP = nobp_neuron_permutations[grep("CEP", nobp_neuron_permutations$V1),]
+CEP = CEP[grep("CEP", CEP$V2),]
+DA = nobp_neuron_permutations[grep("DA0", nobp_neuron_permutations$V1),]
+DA = DA[grep("DA0", DA$V2),]
+DB = nobp_neuron_permutations[grep("DB0", nobp_neuron_permutations$V1),]
+DB = DB[grep("DB0", DB$V2),]
+DD = nobp_neuron_permutations[grep("DD0", nobp_neuron_permutations$V1),]
+DD = DD[grep("DD0", DD$V2),]
+IL1 = nobp_neuron_permutations[grep("IL1", nobp_neuron_permutations$V1),]
+IL1 = IL1[grep("IL1", IL1$V2),]
+IL2 = nobp_neuron_permutations[grep("IL2", nobp_neuron_permutations$V1),]
+IL2 = IL2[grep("IL2", IL2$V2),]
+OLQ = nobp_neuron_permutations[grep("OLQ", nobp_neuron_permutations$V1),]
+OLQ = OLQ[grep("OLQ", OLQ$V2),]
+RME = nobp_neuron_permutations[grep("RME", nobp_neuron_permutations$V1),]
+RME = RME[grep("RME", RME$V2),]
+SAA = nobp_neuron_permutations[grep("SAA", nobp_neuron_permutations$V1),]
+SAA = SAA[grep("SAA", SAA$V2),]
+SAB = nobp_neuron_permutations[grep("SAB", nobp_neuron_permutations$V1),]
+SAB = SAB[grep("SAB", SAB$V2),]
+SIA = nobp_neuron_permutations[grep("SIA", nobp_neuron_permutations$V1),]
+SIA = SIA[grep("SIA", SIA$V2),]
+SIB = nobp_neuron_permutations[grep("SIB", nobp_neuron_permutations$V1),]
+SIB = SIB[grep("SIB", SIB$V2),]
+SMB = nobp_neuron_permutations[grep("SMB", nobp_neuron_permutations$V1),]
+SMB = SMB[grep("SMB", SMB$V2),]
+SMD = nobp_neuron_permutations[grep("SMD", nobp_neuron_permutations$V1),]
+SMD = SMD[grep("SMD", SMD$V2),]
+URA = nobp_neuron_permutations[grep("URA", nobp_neuron_permutations$V1),]
+URA = URA[grep("URA", URA$V2),]
+VA = nobp_neuron_permutations[grep("VA[0-1]", nobp_neuron_permutations$V1),]
+VA = VA[grep("VA[0-1]", VA$V2),]
+VB = nobp_neuron_permutations[grep("VB[0-1]", nobp_neuron_permutations$V1),]
+VB = VB[grep("VB[0-1]", VB$V2),]
+VC = nobp_neuron_permutations[grep("VC[0-1]", nobp_neuron_permutations$V1),]
+VC = VC[grep("VC[0-1]", VC$V2),]
+VD = nobp_neuron_permutations[grep("VD[0-1]", nobp_neuron_permutations$V1),]
+VD = VD[grep("VD[0-1]", VD$V2),]
+# actuallly remove the interclass pairs
+interclass = rbind(RMD, AS, CEP, DA, DB, DD, IL1, IL2, OLQ, RME, SAA, SAB, SIA, SIB, SMB, SMD, URA, VA, VB, VC, VD)
+nobp_neuron_permutations = nobp_neuron_permutations[!rownames(nobp_neuron_permutations) %in% rownames(interclass),]
+
+# get p-value
+p = nrow(nobp_somatic_connectome)/(nrow(nobp_neuron_permutations)*2)
+
+# get number of successes for each gene
+tfs_expression_binary = read.csv("tfs_expression_binary.csv", check.names = F, stringsAsFactors = F)
+gene_names = read.csv("tf_gene_names.csv", header = FALSE)$V1
+gene_names = as.character(gene_names)
+gene_names = trimws(gene_names)
+gene_neurons = function(x) {tfs_expression_binary$Neuron[tfs_expression_binary[x]==1]}
+all_gene_neurons = lapply(gene_names, gene_neurons)
+names(all_gene_neurons) = gene_names
+connectome_gene = function(x) {subset(nobp_somatic_connectome, Source %in% x & Target %in% x)}
+all_genes_connectome = lapply(all_gene_neurons, connectome_gene)
+names(all_genes_connectome) = gene_names
+gene_successes = sapply(all_genes_connectome, NROW)
+gene_successes = as.data.frame(gene_successes) 
+
+# remove genes without successes
+gene_permutations = function(x) nobp_neuron_permutations[(nobp_neuron_permutations[,1] %in% x & nobp_neuron_permutations[,2] %in% x),]
+all_gene_permutations = lapply(all_gene_neurons, gene_permutations)
+names(all_gene_permutations) = gene_names
+gene_permutations = sapply(all_gene_permutations, NROW)
+gene_permutations = as.data.frame(gene_permutations)
+row_sub = apply(gene_permutations, 1, function(row) all(row !=0 ))
+no_zeros_gene_permutations = gene_permutations[row_sub, ,drop=FALSE]
+row_keep = apply(gene_permutations, 1, function(row) all(row==0 ))
+zeros_gene_permutations = gene_permutations[row_keep, ,drop=FALSE]
+zeros_permutation = rownames(zeros_gene_permutations)
+nonzeros_permutation = rownames(no_zeros_gene_permutations)
+zero_permutation_gene_successes = gene_successes[zeros_permutation, , drop = FALSE]
+nonzeros_permutation_gene_successes = gene_successes[nonzeros_permutation, , drop = FALSE]
+
+# get number of trials
+gene_permutations = function(x) nobp_neuron_permutations[(nobp_neuron_permutations[,1] %in% x & nobp_neuron_permutations[,2] %in% x),]
+all_gene_permutations = lapply(all_gene_neurons, gene_permutations)
+names(all_gene_permutations) = gene_names
+gene_permutations = sapply(all_gene_permutations, NROW)
+gene_permutations = as.data.frame(gene_permutations)
+# multiple gene_permutations by two to account for both electrical and chemical
+times_two = function(x) x*2
+gene_permutations = lapply(gene_permutations, times_two)
+gene_permutations = as.data.frame(gene_permutations)
+rownames(gene_permutations) = gene_names
+# filter genes with trials from genes without trials
+row_sub = apply(gene_permutations, 1, function(row) all(row !=0 ))
+no_zeros_gene_permutations = gene_permutations[row_sub, ,drop=FALSE]
+row_keep = apply(gene_permutations, 1, function(row) all(row==0 ))
+zeros_gene_permutations = gene_permutations[row_keep, ,drop=FALSE]
+
+# do binomial test
+gene_binomial_test = function(x,n) binom.test(x, n, p=nrow(nobp_somatic_connectome)/(nrow(nobp_neuron_permutations)*2), alternative='two.sided')$p.value
+p_value = mapply(gene_binomial_test, nonzeros_permutation_gene_successes$gene_successes, no_zeros_gene_permutations$gene_permutations)
+FDR_adjusted_p_value = p.adjust(p_value, method="BH", n = length(gene_names))
+FDR_adjusted_p_value = as.data.frame(FDR_adjusted_p_value)
+p_value = as.data.frame(p_value)
+rownames(p_value) = rownames(nonzeros_permutation_gene_successes)
+rownames(FDR_adjusted_p_value) = rownames(nonzeros_permutation_gene_successes)
+genes_with_trials = cbind(nonzeros_permutation_gene_successes, no_zeros_gene_permutations, p_value, FDR_adjusted_p_value)
+# now add back the genes without trials
+p_value = rep.int("NA", nrow(zeros_gene_permutations))
+p_value = as.data.frame(p_value)
+FDR_adjusted_p_value = rep.int("NA", nrow(zeros_gene_permutations))
+FDR_adjusted_p_value = as.data.frame(FDR_adjusted_p_value)
+rownames(p_value) = rownames(zero_permutation_gene_successes)
+genes_without_trails = cbind(zero_permutation_gene_successes, zeros_gene_permutations, p_value, FDR_adjusted_p_value)
+everything = rbind(genes_with_trials, genes_without_trails)
+Percentage = everything$gene_successes/everything$gene_permutations
+Percentage = as.data.frame(Percentage)
+rownames(Percentage) = rownames(everything)
+everything = cbind(everything, Percentage)
+write.csv(everything, "all_tfs.csv")
+
+# get subset that are significant
+sig_subset = which(everything$FDR_adjusted_p_value < 0.05)
+everything_significant = everything[sig_subset, , drop=FALSE]
+# get subset that are significant and have enriched connectivity
+sig_subset_enriched = which(everything_significant$Percentage > p)
+everything_significant = everything_significant[sig_subset_enriched, , drop=FALSE]
+
+# get a column with neuron classes, only including the somatic neurons
+neuron_names = read.csv("tfs_expression_classes_binary.csv", header = FALSE)$V1
+neuron_names = as.character(neuron_names)
+non_somatic_neuron_names = read.csv("non_somatic_neurons_classes.csv", header = FALSE)$V1
+non_somatic_neuron_names = as.character(non_somatic_neuron_names)
+somatic_neuron_names = neuron_names[!neuron_names %in% non_somatic_neuron_names]
+# make a somatic subset of tf expressions by class
+tfs_expression_classes_binary = read.csv("tfs_expression_classes_binary.csv", check.names = F, stringsAsFactors = F)
+rownames(tfs_expression_classes_binary) = tfs_expression_classes_binary$Neuron
+somatic_tfs_expression_classes_binary = subset(tfs_expression_classes_binary, Neuron %in% somatic_neuron_names)
+significant_genes = rownames(everything_significant)
+# filter subset of tf expressions by class to only have the significant genes
+significant_positive_columns = which(colnames(somatic_tfs_expression_classes_binary) %in% significant_genes)
+significant_positive_expression = somatic_tfs_expression_classes_binary[,significant_positive_columns]
+Neurons = rownames(significant_positive_expression) 
+# create the neuron class column
+gene_names2 = colnames(significant_positive_expression)
+significant_positive_expression = cbind(Neurons, significant_positive_expression)
+gene_neurons = function(x) {significant_positive_expression$Neurons[significant_positive_expression[x]==1]}
+all_gene_neurons = lapply(gene_names2, gene_neurons)
+names(all_gene_neurons) = gene_names2
+# merge the cells so all in one cell
+merge = function(x) paste(all_gene_neurons[[x]], collapse = ', ')
+merged_all_gene_neurons = lapply(gene_names2, merge)
+names(merged_all_gene_neurons) = gene_names2
+Neurons = data.frame(matrix(unlist(merged_all_gene_neurons), nrow=length(merged_all_gene_neurons), byrow=T), stringsAsFactors = F)
+rownames(Neurons) = gene_names2
+names(Neurons) = "Neurons"
+everything_significant_with_neurons = cbind(everything_significant, Neurons)
+write.csv(everything_significant_with_neurons, "all_significant_tfs.csv")
